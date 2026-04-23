@@ -1,7 +1,5 @@
-# word-guess — simple wordle-lite
+# word-guess — wordle-lite
 
-Single HTML file. 5-letter word guessing game, 6 attempts.
-Pick from a small built-in word list (15 words is fine).
-Show letter colors: green=right spot, yellow=wrong spot, gray=not in word.
-On-screen keyboard showing guessed letter states. Dark theme.
-No frameworks.
+Single HTML file. 5-letter word, 6 guesses. 15-word built-in list.
+Letter colors: green=right spot, yellow=wrong spot, gray=not in word.
+On-screen keyboard with guessed states. Dark theme. No frameworks.
