@@ -10,3 +10,5 @@ games/*/dist/
 # Each game is its own git repo, not tracked here
 games/*/
 !games/*.md
+asset-browser/config.json
+asset-browser/data/

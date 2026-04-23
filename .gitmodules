@@ -1,0 +1,6 @@
+[submodule "asset-browser"]
+	path = asset-browser
+	url = https://github.com/SkyWalker2506/asset-browser.git
+[submodule "tools/canvas-level-editor"]
+	path = tools/canvas-level-editor
+	url = https://github.com/SkyWalker2506/canvas-level-editor.git
