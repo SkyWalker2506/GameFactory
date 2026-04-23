@@ -4,3 +4,6 @@
 [submodule "tools/canvas-level-editor"]
 	path = tools/canvas-level-editor
 	url = https://github.com/SkyWalker2506/canvas-level-editor.git
+[submodule "games/tap-reflex"]
+	path = games/tap-reflex
+	url = https://github.com/SkyWalker2506/gamefactory-tap-reflex.git
