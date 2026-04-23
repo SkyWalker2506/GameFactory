@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# gf — GameFactory CLI (thin wrapper around OpenGame)
+# gf — GameFactory CLI
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GAMES="$ROOT/games"
+PRESETS="$ROOT/docs/genre-presets.json"
 
 # Load secrets so GF_DEFAULT_AUTH + provider keys are in env for opengame
 set -a
@@ -13,80 +14,112 @@ set +a
 
 cmd="${1:-help}"; shift || true
 
+# Pull preset prompt template for a given genre from docs/genre-presets.json
+preset_template() {
+  local genre="$1"
+  node -e "const p=require('$PRESETS');process.stdout.write((p['$genre']||{}).promptTemplate||'')" 2>/dev/null
+}
+
 case "$cmd" in
   new)
     name="$1"; shift || true
-    genre="grid_logic"
+    genre="grid_logic"; auth=""
     while [[ $# -gt 0 ]]; do
-      case "$1" in --genre) genre="$2"; shift 2 ;; *) shift ;;
-    esac; done
-    [[ -z "$name" ]] && { echo "usage: gf new <name> [--genre <g>]"; exit 1; }
+      case "$1" in
+        --genre) genre="$2"; shift 2 ;;
+        --cli)   auth="$2"; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    [[ -z "$name" ]] && { echo "usage: gf new <name> [--genre <g>] [--cli <claude|codex|gemini>]"; exit 1; }
     dir="$GAMES/$name"
     mkdir -p "$dir"
+    tpl=$(preset_template "$genre")
     cat > "$dir/GAME.md" <<EOF
 # $name
 
 **Genre:** $genre
 **Created:** $(date +%Y-%m-%d)
 
-## Concept
-(Oyun fikri — bir cümle)
+## Prompt
+${tpl:-(describe the game)}
 
-## Core Loop
-(30 saniyelik temel döngü)
-
-## Mechanics
--
-
-## Win / Lose
--
-
-## Juice / Feel
+## Notes
 -
 EOF
     cat > "$dir/CLAUDE.md" <<EOF
 # $name — Game Project
 
 Parent: GameFactory. Genre: $genre.
-Source of truth: GAME.md. Üretim: \`gf generate $name\`.
+Edit GAME.md → \`gf generate $name\`.
 EOF
-    echo "✓ Created games/$name (genre: $genre)"
-    echo "  → Edit games/$name/GAME.md to describe the game"
-    echo "  → Then: gf generate $name"
+    if [ -n "$auth" ]; then
+      mkdir -p "$dir/.qwen"
+      echo "{\"security\":{\"auth\":{\"selectedType\":\"${auth}-cli\"}}}" > "$dir/.qwen/settings.json"
+    fi
+    echo "✓ Created games/$name (genre: $genre${auth:+, cli: $auth})"
+    echo "  Edit: $dir/GAME.md"
+    echo "  Then: gf generate $name"
     ;;
   generate)
     name="$1"; shift || true
     dir="$GAMES/$name"
     [[ ! -d "$dir" ]] && { echo "no such game: $name"; exit 1; }
-    prompt=$(cat "$dir/GAME.md")
     cd "$dir"
-    opengame -p "$prompt" --yolo
+    opengame -p "$(cat GAME.md)" --yolo
     ;;
   playtest)
     name="$1"; dir="$GAMES/$name"
-    cd "$dir" && npm run dev &
-    echo "→ open http://localhost:5173 (Playwright playtest TBD)"
+    [[ ! -f "$dir/index.html" ]] && { echo "no index.html yet — run 'gf generate $name' first"; exit 1; }
+    node "$ROOT/scripts/playtest.mjs" "$name"
     ;;
   iterate)
     name="$1"; shift; change="$*"
     dir="$GAMES/$name"
     cd "$dir"
-    opengame -p "Apply this change to the existing game: $change" --yolo
+    opengame -p "Apply this change to the existing game (keep it a single HTML file): $change" --yolo
+    ;;
+  ship)
+    name="$1"; dir="$GAMES/$name"
+    [[ ! -f "$dir/index.html" ]] && { echo "no index.html — generate first"; exit 1; }
+    cd "$dir"
+    [ ! -d .git ] && {
+      git init -q
+      git add .
+      git -c user.email=musabkara1990@gmail.com -c user.name="Musab Kara" commit -q -m "feat: initial game (GameFactory)"
+      gh repo create "gamefactory-$name" --public --source=. --push >/dev/null 2>&1 || true
+    } || true
+    vercel deploy --prod --yes --scope skywalker2506s-projects --name "gamefactory-$name" 2>&1 | grep -oE 'https://[^ ]+vercel\.app' | head -1
     ;;
   list)
-    ls -1 "$GAMES" 2>/dev/null || echo "(no games yet)"
+    for d in "$GAMES"/*/; do
+      [ -d "$d" ] || continue
+      n=$(basename "$d")
+      built="·"; [ -f "$d/index.html" ] && built="✓"
+      cli="-"; [ -f "$d/.qwen/settings.json" ] && cli=$(node -e "console.log(require('$d/.qwen/settings.json').security.auth.selectedType.replace('-cli',''))" 2>/dev/null)
+      echo "  $built  $n  [$cli]"
+    done
+    ;;
+  genres)
+    node -e "
+      const p=require('$PRESETS');
+      for (const [k,v] of Object.entries(p)) {
+        console.log('  '+k.padEnd(18)+v.label+'  ('+v.examples.join(', ')+')');
+      }"
     ;;
   help|*)
     cat <<EOF
 gf — GameFactory CLI
 
-  gf new <name> [--genre <g>]   Create a new game project
-  gf generate <name>            Generate game from GAME.md via OpenGame
-  gf playtest <name>            Run dev server
-  gf iterate <name> "<change>"  Apply iterative change
-  gf list                       List games
+  gf new <name> [--genre <g>] [--cli claude|codex|gemini]   Create a game
+  gf generate <name>                                         Run OpenGame on GAME.md
+  gf iterate <name> "<change>"                               Apply change
+  gf playtest <name>                                         Headless Playwright test
+  gf ship <name>                                             Git + GitHub + Vercel prod
+  gf list                                                    List games with status
+  gf genres                                                  List genre presets
 
-Genres: platformer, top_down, tower_defense, grid_logic, ui_heavy
+Run 'gf genres' to see available --genre values.
 EOF
     ;;
 esac

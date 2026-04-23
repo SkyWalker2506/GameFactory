@@ -1,0 +1,62 @@
+{
+  "grid_logic": {
+    "label": "Grid Puzzle",
+    "examples": ["match-3", "2048", "sokoban", "minesweeper"],
+    "promptTemplate": "Build a grid-based puzzle game in a single HTML file. No frameworks. Dark theme. Include: clear win/lose state, move counter, reset button, mobile-responsive tap targets (min 44px), satisfying transition on each move (100-200ms). Mechanics:"
+  },
+  "hyper_casual": {
+    "label": "Hyper-Casual 1-Tap",
+    "examples": ["flappy", "doodle jump", "stack"],
+    "promptTemplate": "Build a hyper-casual 1-tap game in a single HTML file. No frameworks. Requirements: score + best score in localStorage, game-over screen, one-tap control, bright colors, tactile feedback on tap (scale + brief particle). 60fps smooth. Game idea:"
+  },
+  "idle_clicker": {
+    "label": "Idle / Clicker",
+    "examples": ["cookie clicker", "incremental"],
+    "promptTemplate": "Build an idle/clicker game in a single HTML file. No frameworks. Include: main clickable resource, at least 3 upgrades with increasing cost, auto-income tick every second, save/load to localStorage every 5s. Clean UI with number formatting (1.2K, 3.4M). Theme:"
+  },
+  "card_battle": {
+    "label": "Turn-Based Card",
+    "examples": ["solitaire", "uno lite", "simple TCG"],
+    "promptTemplate": "Build a turn-based card game in a single HTML file. No frameworks. Include: deck, hand, discard, clear turn indicator, opponent AI (simple rule-based), end-game screen with winner. Smooth card draw animation. Rules:"
+  },
+  "tower_defense": {
+    "label": "Tower Defense",
+    "examples": ["bloons-lite", "plants vs zombies lite"],
+    "promptTemplate": "Build a tower defense game in a single HTML file on a canvas or CSS grid. No frameworks. Include: at least 2 tower types, wave progression (5 waves), enemy HP bars, currency for buying towers, win/lose. Path-based movement. Theme:"
+  },
+  "quiz": {
+    "label": "Quiz / Word",
+    "examples": ["wordle", "trivia", "hangman"],
+    "promptTemplate": "Build a word/quiz game in a single HTML file. No frameworks. Include: built-in word or question list (15+ items), feedback per answer (right/wrong/close), score tracking, restart button, on-screen keyboard if letter-input. Dark theme."
+  },
+  "top_down": {
+    "label": "Top-Down Shooter/Roguelite 2D",
+    "examples": ["vampire survivors lite", "archero lite"],
+    "promptTemplate": "Build a top-down 2D game on canvas in a single HTML file. No frameworks. Include: player (WASD/arrows + mobile joystick), enemies with basic AI, projectiles or melee, HP bar, wave-based progression, game-over screen. Smooth 60fps. Theme:"
+  },
+  "platformer": {
+    "label": "2D Platformer",
+    "examples": ["celeste mini", "retro mario-lite"],
+    "promptTemplate": "Build a 2D platformer on canvas in a single HTML file. No frameworks. Include: AABB collision, gravity+jump, coyote time (100ms), at least 1 level with platforms+goal, death/respawn, win screen. Arrow keys + space. Theme:"
+  },
+  "visual_novel": {
+    "label": "Visual Novel / Text Adventure",
+    "examples": ["choose-your-own", "interactive fiction"],
+    "promptTemplate": "Build a text-based interactive story in a single HTML file. No frameworks. Include: branching choices (at least 3 endings), typed-out text effect (20ms/char), character name tags, location indicators, restart. Moody theme. Story:"
+  },
+  "reflex": {
+    "label": "Reflex / Reaction",
+    "examples": ["reaction test", "piano tiles lite"],
+    "promptTemplate": "Build a reflex/reaction game in a single HTML file. No frameworks. Include: best reaction time in localStorage, 5-round average, visual+audio cue (Web Audio beep), false-start detection, clean UI. Mechanic:"
+  },
+  "physics_sandbox": {
+    "label": "Physics Sandbox",
+    "examples": ["angry birds lite", "crayon physics"],
+    "promptTemplate": "Build a physics game in a single HTML file using simple Verlet or Euler integration (no Matter.js). Include: gravity, drag-to-aim mechanic, 3 levels, target objects to hit, win per level. Clean canvas rendering. Theme:"
+  },
+  "educational": {
+    "label": "Educational Mini-Game",
+    "examples": ["math drill", "language mini-game"],
+    "promptTemplate": "Build an educational mini-game in a single HTML file. No frameworks. Include: adaptive difficulty, streak counter, encouraging feedback (no negative shaming), restart. Bright, child-friendly dark theme. Subject & age:"
+  }
+}
