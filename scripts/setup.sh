@@ -98,6 +98,10 @@ set -e
 prompt_if_missing(){
   local var="$1" label="$2"
   if [ -z "${!var}" ]; then
+    if [ ! -t 0 ]; then
+      yellow "  $label not set (non-interactive, skipping)"
+      return
+    fi
     yellow "  $label not set."
     read -r -p "    Enter $var (blank to skip): " val
     if [ -n "$val" ]; then
