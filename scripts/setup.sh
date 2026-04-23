@@ -3,7 +3,7 @@
 #
 # What it does (idempotent):
 #   1. Checks Node >=20
-#   2. Installs subscription CLIs (claude, codex, gemini) if missing
+#   2. Installs subscription CLIs (claude, codex, gemini, opencode) if missing
 #   3. Creates GameFactory/secrets/ with secrets.env skeleton
 #   4. Symlinks from ~/Projects/claude-config/claude-secrets/ if present
 #   5. Prompts for any missing credential interactively
@@ -50,6 +50,7 @@ install_cli(){
 install_cli claude "@anthropic-ai/claude-code"
 install_cli codex  "@openai/codex"
 install_cli gemini "@google/gemini-cli"
+install_cli opencode "opencode-ai"
 
 bold "==> 3/6  Secrets directory"
 mkdir -p "$LOCAL_SECRETS_DIR"
@@ -63,13 +64,14 @@ if [ ! -f "$LOCAL_SECRETS" ]; then
 # DOUBAO_API_KEY=
 # OPENAI_API_KEY=
 
-# Which CLI to use by default (claude-cli | codex-cli | gemini-cli):
+# Which CLI to use by default (claude-cli | codex-cli | gemini-cli | opencode-cli):
 GF_DEFAULT_AUTH=claude-cli
 
 # Optional model overrides:
 # CLAUDE_CLI_MODEL=claude-opus-4-7
 # CODEX_CLI_MODEL=gpt-5.4
 # GEMINI_CLI_MODEL=gemini-2.5-pro
+# OPENCODE_CLI_MODEL=openai/gpt-5
 EOF
   green "  created $LOCAL_SECRETS"
 else
@@ -167,4 +169,4 @@ echo "  gf new my-puzzle --genre grid_logic"
 echo "  gf generate my-puzzle"
 echo ""
 echo "Switch CLI any time by editing $LOCAL_SECRETS (GF_DEFAULT_AUTH)"
-echo "  valid values: claude-cli | codex-cli | gemini-cli"
+echo "  valid values: claude-cli | codex-cli | gemini-cli | opencode-cli"

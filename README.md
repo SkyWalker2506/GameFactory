@@ -1,6 +1,6 @@
 # GameFactory
 
-LLM-driven web game factory built on [OpenGame](https://github.com/leigest519/OpenGame) — uses **your subscription CLIs** (Claude Code, Codex, Gemini) instead of paid API keys.
+LLM-driven web game factory built on [OpenGame](https://github.com/leigest519/OpenGame) — uses **your coding CLIs** (Claude Code, Codex, Gemini, OpenCode) instead of paid API keys.
 
 Tarif et → üret → oto-playtest → yayınla.
 
@@ -30,14 +30,14 @@ git clone <this-repo> && cd GameFactory
 ## What setup.sh does (idempotent)
 
 - Node 20+ check
-- Installs `claude`, `codex`, `gemini` CLIs if missing (`npm i -g`)
+- Installs `claude`, `codex`, `gemini`, `opencode` CLIs if missing (`npm i -g`)
 - Creates `secrets/secrets.env` (gitignored) + links to `~/Projects/claude-config/claude-secrets/`
 - Prompts for missing creds (skippable)
 - OpenGame `npm install` + `npm run bundle` + `npm link`
 - Writes `~/.qwen/settings.json` → `selectedType: claude-cli`
 - `xattr -cr` workaround for macOS Gatekeeper killing esbuild install
 
-Switch default CLI via `secrets/secrets.env` → `GF_DEFAULT_AUTH=claude-cli|codex-cli|gemini-cli`, or per-game with `gf new ... --cli <name>`.
+Switch default CLI via `secrets/secrets.env` → `GF_DEFAULT_AUTH=claude-cli|codex-cli|gemini-cli|opencode-cli`, or per-game with `gf new ... --cli <name>`.
 
 ## Architecture
 
@@ -73,7 +73,7 @@ OpenGame → CliContentGenerator → spawn: claude -p --output-format json
           OpenGame ← GenerateContentResponse
 ```
 
-Three new `AuthType`s added: `USE_CLAUDE_CLI`, `USE_CODEX_CLI`, `USE_GEMINI_CLI`.
+Four CLI `AuthType`s added: `USE_CLAUDE_CLI`, `USE_CODEX_CLI`, `USE_GEMINI_CLI`, `USE_OPENCODE_CLI`.
 Trade-offs: no fine-grained tool-use loop, no embeddings, approximate token count. For single-shot game gen it works great.
 
 ## Supported genres

@@ -31,7 +31,7 @@ case "$cmd" in
         *) shift ;;
       esac
     done
-    [[ -z "$name" ]] && { echo "usage: gf new <name> [--genre <g>] [--cli <claude|codex|gemini>]"; exit 1; }
+    [[ -z "$name" ]] && { echo "usage: gf new <name> [--genre <g>] [--cli <claude|codex|gemini|opencode>]"; exit 1; }
     dir="$GAMES/$name"
     mkdir -p "$dir"
     tpl=$(preset_template "$genre")
@@ -111,7 +111,7 @@ EOF
     cat <<EOF
 gf — GameFactory CLI
 
-  gf new <name> [--genre <g>] [--cli claude|codex|gemini]   Create a game
+  gf new <name> [--genre <g>] [--cli claude|codex|gemini|opencode]   Create a game
   gf generate <name>                                         Run OpenGame on GAME.md
   gf iterate <name> "<change>"                               Apply change
   gf playtest <name>                                         Headless Playwright test
