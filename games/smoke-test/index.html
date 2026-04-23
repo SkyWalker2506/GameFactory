@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>smoke — 3x3 color grid</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #0f1115;
+    color: #e8e8ea;
+  }
+  h1 { margin: 0; font-size: 1.25rem; letter-spacing: 0.02em; opacity: 0.85; }
+  #status { font-size: 0.95rem; opacity: 0.8; min-height: 1.2em; }
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(3, 88px);
+    grid-template-rows: repeat(3, 88px);
+    gap: 8px;
+  }
+  .tile {
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.08s ease, filter 0.15s ease;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  }
+  .tile:hover { filter: brightness(1.15); }
+  .tile:active { transform: scale(0.96); }
+  .c0 { background: #e23e57; }
+  .c1 { background: #3ec9e2; }
+  .c2 { background: #e2c53e; }
+  button.reset {
+    background: #1f2430;
+    color: #e8e8ea;
+    border: 1px solid #2e3442;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  button.reset:hover { background: #272d3b; }
+  .won #status { color: #7ee787; font-weight: 600; }
+</style>
+</head>
+<body>
+  <h1>smoke — make all tiles the same color</h1>
+  <div id="grid"></div>
+  <div id="status">Moves: 0</div>
+  <button class="reset" id="reset">Reset</button>
+
+<script>
+  const COLORS = 3;
+  const SIZE = 3;
+  const grid = document.getElementById('grid');
+  const status = document.getElementById('status');
+  const resetBtn = document.getElementById('reset');
+  let tiles = [];
+  let moves = 0;
+
+  function randomBoard() {
+    const b = Array.from({ length: SIZE * SIZE }, () => Math.floor(Math.random() * COLORS));
+    // ensure not already solved
+    if (b.every(v => v === b[0])) b[0] = (b[0] + 1) % COLORS;
+    return b;
+  }
+
+  let board = randomBoard();
+
+  function render() {
+    grid.innerHTML = '';
+    tiles = board.map((c, i) => {
+      const btn = document.createElement('button');
+      btn.className = `tile c${c}`;
+      btn.setAttribute('aria-label', `tile ${i + 1}`);
+      btn.addEventListener('click', () => handleClick(i));
+      grid.appendChild(btn);
+      return btn;
+    });
+    updateStatus();
+  }
+
+  function handleClick(i) {
+    if (document.body.classList.contains('won')) return;
+    board[i] = (board[i] + 1) % COLORS;
+    moves++;
+    const tile = tiles[i];
+    tile.className = `tile c${board[i]}`;
+    updateStatus();
+  }
+
+  function updateStatus() {
+    const solved = board.every(v => v === board[0]);
+    if (solved) {
+      status.textContent = `Solved in ${moves} moves! 🎉`;
+      document.body.classList.add('won');
+    } else {
+      status.textContent = `Moves: ${moves}`;
+      document.body.classList.remove('won');
+    }
+  }
+
+  resetBtn.addEventListener('click', () => {
+    board = randomBoard();
+    moves = 0;
+    document.body.classList.remove('won');
+    render();
+  });
+
+  render();
+</script>
+</body>
+</html>
