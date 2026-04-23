@@ -120,10 +120,24 @@ bold "==> 6/6  OpenGame install + link"
 cd "$ROOT/factory/opengame"
 if [ ! -d node_modules ]; then
   yellow "  Running npm install (first time — 2-3 min)..."
+  # macOS Gatekeeper sometimes SIGKILLs esbuild's install.js. Clear xattrs first.
+  xattr -cr . 2>/dev/null || true
   npm install
 else
   green "  node_modules ✓ (delete to force reinstall)"
 fi
+
+# Rebuild bundle if any of our patched sources are newer than dist/cli.js
+if [ ! -f dist/cli.js ] || \
+   [ packages/core/src/core/cliContentGenerator/cliContentGenerator.ts -nt dist/cli.js ] || \
+   [ packages/cli/src/config/auth.ts -nt dist/cli.js ] || \
+   [ packages/core/src/core/contentGenerator.ts -nt dist/cli.js ]; then
+  yellow "  Building bundle (includes GameFactory CLI adapter)..."
+  npm run bundle
+else
+  green "  dist/cli.js ✓ (up-to-date)"
+fi
+
 if ! command -v opengame >/dev/null; then
   yellow "  Linking opengame CLI globally..."
   npm link
@@ -136,8 +150,11 @@ mkdir -p "$QWEN_DIR"
 AUTH="${GF_DEFAULT_AUTH:-claude-cli}"
 cat > "$QWEN_SETTINGS" <<EOF
 {
-  "authType": "$AUTH",
-  "approvalMode": "yolo"
+  "security": {
+    "auth": {
+      "selectedType": "$AUTH"
+    }
+  }
 }
 EOF
 green "  authType = $AUTH"
