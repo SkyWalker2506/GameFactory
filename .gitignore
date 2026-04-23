@@ -6,3 +6,7 @@ secrets/
 games/*/node_modules/
 games/*/dist/
 *.log
+
+# Each game is its own git repo, not tracked here
+games/*/
+!games/*.md
