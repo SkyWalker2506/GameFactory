@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# gf — GameFactory CLI (thin wrapper around OpenGame)
+set -e
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+GAMES="$ROOT/games"
+
+# Load secrets so GF_DEFAULT_AUTH + provider keys are in env for opengame
+set -a
+[ -f "$ROOT/secrets/secrets.env" ] && . "$ROOT/secrets/secrets.env"
+[ -f "$HOME/Projects/claude-config/claude-secrets/secrets.env" ] && \
+  . "$HOME/Projects/claude-config/claude-secrets/secrets.env"
+set +a
+
+cmd="${1:-help}"; shift || true
+
+case "$cmd" in
+  new)
+    name="$1"; shift || true
+    genre="grid_logic"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in --genre) genre="$2"; shift 2 ;; *) shift ;;
+    esac; done
+    [[ -z "$name" ]] && { echo "usage: gf new <name> [--genre <g>]"; exit 1; }
+    dir="$GAMES/$name"
+    mkdir -p "$dir"
+    cat > "$dir/GAME.md" <<EOF
+# $name
+
+**Genre:** $genre
+**Created:** $(date +%Y-%m-%d)
+
+## Concept
+(Oyun fikri — bir cümle)
+
+## Core Loop
+(30 saniyelik temel döngü)
+
+## Mechanics
+-
+
+## Win / Lose
+-
+
+## Juice / Feel
+-
+EOF
+    cat > "$dir/CLAUDE.md" <<EOF
+# $name — Game Project
+
+Parent: GameFactory. Genre: $genre.
+Source of truth: GAME.md. Üretim: \`gf generate $name\`.
+EOF
+    echo "✓ Created games/$name (genre: $genre)"
+    echo "  → Edit games/$name/GAME.md to describe the game"
+    echo "  → Then: gf generate $name"
+    ;;
+  generate)
+    name="$1"; shift || true
+    dir="$GAMES/$name"
+    [[ ! -d "$dir" ]] && { echo "no such game: $name"; exit 1; }
+    prompt=$(cat "$dir/GAME.md")
+    cd "$dir"
+    opengame -p "$prompt" --yolo
+    ;;
+  playtest)
+    name="$1"; dir="$GAMES/$name"
+    cd "$dir" && npm run dev &
+    echo "→ open http://localhost:5173 (Playwright playtest TBD)"
+    ;;
+  iterate)
+    name="$1"; shift; change="$*"
+    dir="$GAMES/$name"
+    cd "$dir"
+    opengame -p "Apply this change to the existing game: $change" --yolo
+    ;;
+  list)
+    ls -1 "$GAMES" 2>/dev/null || echo "(no games yet)"
+    ;;
+  help|*)
+    cat <<EOF
+gf — GameFactory CLI
+
+  gf new <name> [--genre <g>]   Create a new game project
+  gf generate <name>            Generate game from GAME.md via OpenGame
+  gf playtest <name>            Run dev server
+  gf iterate <name> "<change>"  Apply iterative change
+  gf list                       List games
+
+Genres: platformer, top_down, tower_defense, grid_logic, ui_heavy
+EOF
+    ;;
+esac
