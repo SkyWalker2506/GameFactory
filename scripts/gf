@@ -20,6 +20,37 @@ preset_template() {
   node -e "const p=require('$PRESETS');process.stdout.write((p['$genre']||{}).promptTemplate||'')" 2>/dev/null
 }
 
+# Read the CLI backend stored in .qwen/settings.json (defaults to opengame)
+get_cli() {
+  local dir="$1"
+  if [ -f "$dir/.qwen/settings.json" ]; then
+    node -e "console.log(require('$dir/.qwen/settings.json').security.auth.selectedType.replace('-cli',''))" 2>/dev/null
+  fi
+}
+
+# Run a prompt through the selected CLI backend
+run_cli() {
+  local cli="$1"; local prompt="$2"
+  case "$cli" in
+    claude)
+      claude --print "$prompt"
+      ;;
+    codex)
+      codex "$prompt"
+      ;;
+    gemini)
+      gemini -p "$prompt"
+      ;;
+    opencode)
+      opencode run "$prompt"
+      ;;
+    *)
+      # default: opengame
+      opengame -p "$prompt" --yolo
+      ;;
+  esac
+}
+
 case "$cmd" in
   new)
     name="$1"; shift || true
@@ -65,8 +96,10 @@ EOF
     name="$1"; shift || true
     dir="$GAMES/$name"
     [[ ! -d "$dir" ]] && { echo "no such game: $name"; exit 1; }
+    cli=$(get_cli "$dir")
+    echo "→ generate [$name] via ${cli:-opengame}"
     cd "$dir"
-    opengame -p "$(cat GAME.md)" --yolo
+    run_cli "$cli" "$(cat GAME.md)"
     ;;
   playtest)
     name="$1"; dir="$GAMES/$name"
@@ -76,8 +109,11 @@ EOF
   iterate)
     name="$1"; shift; change="$*"
     dir="$GAMES/$name"
+    [[ ! -d "$dir" ]] && { echo "no such game: $name"; exit 1; }
+    cli=$(get_cli "$dir")
+    echo "→ iterate [$name] via ${cli:-opengame}"
     cd "$dir"
-    opengame -p "Apply this change to the existing game (keep it a single HTML file): $change" --yolo
+    run_cli "$cli" "Apply this change to the existing game (keep it a single HTML file): $change"
     ;;
   ship)
     name="$1"; dir="$GAMES/$name"
