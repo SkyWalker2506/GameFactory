@@ -24,7 +24,9 @@ preset_template() {
 get_cli() {
   local dir="$1"
   if [ -f "$dir/.qwen/settings.json" ]; then
-    node -e "console.log(require('$dir/.qwen/settings.json').security.auth.selectedType.replace('-cli',''))" 2>/dev/null
+    node -e "console.log(require('$dir/.qwen/settings.json').security.auth.selectedType.replace('-cli',''))" 2>/dev/null || echo "opengame"
+  else
+    echo "opengame"
   fi
 }
 
@@ -32,48 +34,53 @@ get_cli() {
 run_cli() {
   local cli="$1"; local prompt="$2"
   case "$cli" in
-    claude)
-      claude --print "$prompt"
-      ;;
-    codex)
-      codex "$prompt"
-      ;;
-    gemini)
-      gemini -p "$prompt"
-      ;;
-    opencode)
-      opencode run "$prompt"
-      ;;
-    *)
-      # default: opengame
-      opengame -p "$prompt" --yolo
-      ;;
+    claude)   claude --print "$prompt" ;;
+    codex)    codex "$prompt" ;;
+    gemini)   gemini -p "$prompt" ;;
+    opencode) opencode run "$prompt" ;;
+    *)        opengame -p "$prompt" --yolo ;;
   esac
+}
+
+# Read playtest-report.json and emit "verdict|errors|warnings|fps_avg"
+read_report_stats() {
+  local dir="$1"
+  node -e "try{const r=require('$dir/playtest-report.json');console.log(r.verdict+'|'+r.errors.length+'|'+r.warnings.length+'|'+(r.fps.avg!==null?r.fps.avg.toFixed(1):'null'))}catch(e){console.log('FAIL|99|99|null')}"
 }
 
 case "$cmd" in
   new)
     name="$1"; shift || true
-    genre="grid_logic"; auth=""
+    [[ -z "$name" ]] && { echo "usage: gf new <name> [\"<idea>\"] [--genre <g>] [--cli <claude|codex|gemini|opencode>] [--design]"; exit 1; }
+    # Optional positional idea (first non-flag arg)
+    idea=""
+    if [[ $# -gt 0 && ! "$1" =~ ^-- ]]; then
+      idea="$1"; shift || true
+    fi
+    genre="grid_logic"; auth=""; do_design=0
     while [[ $# -gt 0 ]]; do
       case "$1" in
-        --genre) genre="$2"; shift 2 ;;
-        --cli)   auth="$2"; shift 2 ;;
-        *) shift ;;
+        --genre)  genre="$2"; shift 2 ;;
+        --cli)    auth="$2"; shift 2 ;;
+        --design) do_design=1; shift 1 ;;
+        *)        shift ;;
       esac
     done
-    [[ -z "$name" ]] && { echo "usage: gf new <name> [--genre <g>] [--cli <claude|codex|gemini|opencode>]"; exit 1; }
     dir="$GAMES/$name"
     mkdir -p "$dir"
     tpl=$(preset_template "$genre")
+    body="${idea:-(describe the game)}"
     cat > "$dir/GAME.md" <<EOF
 # $name
 
 **Genre:** $genre
 **Created:** $(date +%Y-%m-%d)
 
-## Prompt
-${tpl:-(describe the game)}
+## Idea
+$body
+
+## Genre preset
+${tpl:-(no preset for $genre)}
 
 ## Notes
 -
@@ -82,16 +89,186 @@ EOF
 # $name — Game Project
 
 Parent: GameFactory. Genre: $genre.
-Edit GAME.md → \`gf generate $name\`.
+Edit GAME.md → \`gf design $name\` (expand with Gemini) → \`gf generate $name\`.
 EOF
     if [ -n "$auth" ]; then
       mkdir -p "$dir/.qwen"
       echo "{\"security\":{\"auth\":{\"selectedType\":\"${auth}-cli\"}}}" > "$dir/.qwen/settings.json"
     fi
     echo "✓ Created games/$name (genre: $genre${auth:+, cli: $auth})"
-    echo "  Edit: $dir/GAME.md"
-    echo "  Then: gf generate $name"
+    if [ "$do_design" -eq 1 ]; then
+      "$0" design "$name"
+    else
+      echo "  Edit:   $dir/GAME.md"
+      echo "  Design: gf design $name      (expand with Gemini 3 Pro)"
+      echo "  Build:  gf generate $name"
+    fi
     ;;
+
+  design)
+    name="$1"; shift || true
+    [[ -z "$name" ]] && { echo "usage: gf design <name> [--force]"; exit 1; }
+    dir="$GAMES/$name"
+    game_md="$dir/GAME.md"
+    [ -f "$game_md" ] || { echo "GAME.md not found in $name"; exit 1; }
+
+    force=0
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --force) force=1; shift ;;
+        *)       shift ;;
+      esac
+    done
+
+    lines=$(grep -c . "$game_md" || echo 0)
+    if [ "$lines" -ge 200 ] && [ "$force" -eq 0 ]; then
+      echo "GAME.md already expanded ($lines non-empty lines). Use --force to re-expand."
+      exit 0
+    fi
+
+    cp "$game_md" "$game_md.bak"
+
+    extra_ctx=""
+    if [ -f "$dir/CLAUDE.md" ]; then
+      extra_ctx=$'\n\nAdditional context (CLAUDE.md):\n'"$(cat "$dir/CLAUDE.md")"
+    fi
+
+    prompt="Expand the short game idea below into a full Game Design Document (GDD). Use these EXACT sections in this order:
+
+1. **One-liner** — refined pitch.
+2. **Target feel & references** — 2-3 reference games + the visceral feeling.
+3. **Core loop** — 30-second loop, then 5-minute loop.
+4. **Mechanics** — every mechanic as a bullet with a number/formula (e.g., 'Jump height: 320px in 0.42s, gravity 980 px/s²'). Be specific. No vague verbs.
+5. **Win/lose conditions** — exact triggers.
+6. **Progression** — what unlocks/scales over time.
+7. **UI/UX** — screens, HUD elements, mobile tap-target sizes (min 44px), color palette in hex.
+8. **Juice spec** — explicit list: burst/spark effects (when, count, color), screen shake (trigger, magnitude px, duration s), SFX (Web Audio waveform + frequency Hz + ADSR), tween easings.
+9. **Tech notes** — single-file vs Vite, fps target, save/load shape.
+10. **Anti-patterns** — what NOT to do (max 5 items).
+11. **Stretch goals** — out of scope for v1 but on radar.
+
+Output target: 250-500 lines of Markdown, English, concrete numbers everywhere, no fluff.
+
+Original GAME.md:
+$(cat "$game_md")$extra_ctx"
+
+    echo "→ design [$name] via Gemini 3 Pro (this may take ~30-60s)..."
+    if res=$(gemini -m gemini-3-pro-preview -p "$prompt" 2>/tmp/gf-design-err); then
+      if [ -n "$res" ]; then
+        # Strip leading/trailing markdown code fences if Gemini wrapped output
+        res=$(printf '%s\n' "$res" | awk '
+          NR==1 && /^```[a-zA-Z]*$/ { next }
+          { print }
+        ' | awk '
+          { lines[NR]=$0 }
+          END {
+            n=NR
+            if (lines[n] ~ /^```$/) n--
+            for (i=1;i<=n;i++) print lines[i]
+          }
+        ')
+        printf '%s\n' "$res" > "$game_md"
+        new_lines=$(grep -c . "$game_md" || echo 0)
+        echo "✓ GDD expanded: $lines → $new_lines lines"
+        echo "  Backup: $game_md.bak"
+      else
+        echo "✗ Gemini returned empty output. Restoring backup."
+        mv "$game_md.bak" "$game_md"
+        exit 1
+      fi
+    else
+      echo "✗ Gemini call failed. Restoring backup."
+      cat /tmp/gf-design-err >&2
+      mv "$game_md.bak" "$game_md"
+      exit 1
+    fi
+    ;;
+
+  refine)
+    name="$1"; shift || true
+    [[ -z "$name" ]] && { echo "usage: gf refine <name> [--rounds <n>] [--cli <cli>]"; exit 1; }
+    dir="$GAMES/$name"
+    [ -f "$dir/index.html" ] || { echo "no index.html — run 'gf generate $name' first"; exit 1; }
+
+    rounds=3; cli_opt=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --rounds) rounds="$2"; shift 2 ;;
+        --cli)    cli_opt="$2"; shift 2 ;;
+        *)        shift ;;
+      esac
+    done
+    [ "$rounds" -lt 1 ] && rounds=1
+    [ "$rounds" -gt 5 ] && rounds=5
+
+    target_cli="${cli_opt:-$(get_cli "$dir")}"
+    echo "→ refine [$name] up to $rounds round(s) via $target_cli"
+
+    cd "$dir"
+    for (( i=1; i<=rounds; i++ )); do
+      node "$ROOT/scripts/playtest.mjs" "$name" > /dev/null 2>&1 || true
+      stats=$(read_report_stats "$dir")
+      IFS='|' read -r verdict e_cnt w_cnt fps_avg <<< "$stats"
+
+      if [ "$verdict" = "PASS" ] && [ "$e_cnt" -eq 0 ] && [ "$w_cnt" -le 2 ]; then
+        echo "✓ round $i: clean (errors=$e_cnt, warnings=$w_cnt, fps=$fps_avg) — stopping early"
+        break
+      fi
+
+      echo "→ round $i: errors=$e_cnt, warnings=$w_cnt, fps=$fps_avg — patching..."
+
+      refine_prompt="Apply MINIMAL targeted fixes to the existing game. Address in this order: (1) console errors, (2) warnings, (3) juice gaps from GDD if any. Keep the file structure (single-file HTML stays single-file). Output the COMPLETE updated index.html.
+
+=== GAME.md (design intent) ===
+$(cat "$dir/GAME.md")
+
+=== current index.html ===
+$(cat "$dir/index.html")
+
+=== playtest-report.json ===
+$(cat "$dir/playtest-report.json")"
+
+      run_cli "$target_cli" "$refine_prompt"
+
+      node "$ROOT/scripts/playtest.mjs" "$name" > /dev/null 2>&1 || true
+      new_stats=$(read_report_stats "$dir")
+      IFS='|' read -r new_v new_e new_w new_fps <<< "$new_stats"
+      echo "  round $i result: errors $e_cnt→$new_e, warnings $w_cnt→$new_w, fps $fps_avg→$new_fps"
+    done
+    echo "✓ refine complete"
+    ;;
+
+  score)
+    name="$1"; shift || true
+    [[ -z "$name" ]] && { echo "usage: gf score <name>"; exit 1; }
+    dir="$GAMES/$name"
+    [ -f "$dir/index.html" ] || { echo "no index.html — run 'gf generate $name' first"; exit 1; }
+
+    node "$ROOT/scripts/playtest.mjs" "$name" > /dev/null 2>&1 || true
+    node -e "
+      const fs = require('fs');
+      const r = require('$dir/playtest-report.json');
+      const errs = r.errors.length;
+      const warns = r.warnings.length;
+      const fps = r.fps.avg !== null ? r.fps.avg : 30;
+      const mem = r.memory.usedMB || 0;
+      let score = 100 - (errs * 20) - (warns * 5);
+      if (fps >= 55) score += 0; else if (fps >= 30) score -= 5; else score -= 15;
+      score = Math.max(0, Math.min(100, score));
+      const out = {
+        errors_count: errs,
+        warnings_count: warns,
+        fps_avg: r.fps.avg,
+        mem_mb: mem,
+        gdd_compliance: 'manual-pending',
+        total_score: score
+      };
+      const md = '# Score — $name\n\nGenerated: ' + new Date().toISOString() + '\n\n\`\`\`json\n' + JSON.stringify(out, null, 2) + '\n\`\`\`\n';
+      fs.writeFileSync('$dir/SCORE.md', md);
+      console.log(JSON.stringify(out, null, 2));
+    "
+    ;;
+
   generate)
     name="$1"; shift || true
     dir="$GAMES/$name"
@@ -101,11 +278,13 @@ EOF
     cd "$dir"
     run_cli "$cli" "$(cat GAME.md)"
     ;;
+
   playtest)
     name="$1"; dir="$GAMES/$name"
     [[ ! -f "$dir/index.html" ]] && { echo "no index.html yet — run 'gf generate $name' first"; exit 1; }
     node "$ROOT/scripts/playtest.mjs" "$name"
     ;;
+
   iterate)
     name="$1"; shift; change="$*"
     dir="$GAMES/$name"
@@ -115,6 +294,7 @@ EOF
     cd "$dir"
     run_cli "$cli" "Apply this change to the existing game (keep it a single HTML file): $change"
     ;;
+
   ship)
     name="$1"; dir="$GAMES/$name"
     [[ ! -f "$dir/index.html" ]] && { echo "no index.html — generate first"; exit 1; }
@@ -127,15 +307,21 @@ EOF
     } || true
     vercel deploy --prod --yes --scope skywalker2506s-projects --name "gamefactory-$name" 2>&1 | grep -oE 'https://[^ ]+vercel\.app' | head -1
     ;;
+
   list)
     for d in "$GAMES"/*/; do
       [ -d "$d" ] || continue
       n=$(basename "$d")
       built="·"; [ -f "$d/index.html" ] && built="✓"
+      gdd="·"; [ -f "$d/GAME.md" ] && {
+        gl=$(grep -c . "$d/GAME.md" 2>/dev/null || echo 0)
+        [ "$gl" -ge 200 ] && gdd="✓" || gdd="$gl"
+      }
       cli="-"; [ -f "$d/.qwen/settings.json" ] && cli=$(node -e "console.log(require('$d/.qwen/settings.json').security.auth.selectedType.replace('-cli',''))" 2>/dev/null)
-      echo "  $built  $n  [$cli]"
+      printf "  %s  gdd:%-4s  %-22s  [%s]\n" "$built" "$gdd" "$n" "$cli"
     done
     ;;
+
   genres)
     node -e "
       const p=require('$PRESETS');
@@ -143,18 +329,23 @@ EOF
         console.log('  '+k.padEnd(18)+v.label+'  ('+v.examples.join(', ')+')');
       }"
     ;;
+
   help|*)
     cat <<EOF
 gf — GameFactory CLI
 
-  gf new <name> [--genre <g>] [--cli claude|codex|gemini|opencode]   Create a game
-  gf generate <name>                                         Run OpenGame on GAME.md
-  gf iterate <name> "<change>"                               Apply change
-  gf playtest <name>                                         Headless Playwright test
-  gf ship <name>                                             Git + GitHub + Vercel prod
-  gf list                                                    List games with status
-  gf genres                                                  List genre presets
+  gf new <name> ["<idea>"] [--genre <g>] [--cli <c>] [--design]   Create a game shell
+  gf design <name> [--force]                                Expand GAME.md via Gemini 3 Pro (full GDD)
+  gf generate <name>                                        Run selected CLI on GAME.md
+  gf refine <name> [--rounds <n>] [--cli <c>]               Multi-pass playtest→fix loop
+  gf score <name>                                           Playtest + numeric quality score → SCORE.md
+  gf iterate <name> "<change>"                              Apply targeted change
+  gf playtest <name>                                        Headless Playwright test → playtest-report.json
+  gf ship <name>                                            Git + GitHub + Vercel prod
+  gf list                                                   List games (build/gdd/cli columns)
+  gf genres                                                 List genre presets
 
+Recommended pipeline:  new → design → generate → refine → score → ship
 Run 'gf genres' to see available --genre values.
 EOF
     ;;
